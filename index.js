@@ -10,12 +10,15 @@ const authRoutes = require("./routes/authRoutes");
 const adminAuthRoutes = require("./routes/adminAuthRoutes");
 const adminUserRoutes = require("./routes/adminUserRoutes");
 const adminDashboardRoutes = require("./routes/adminDashboardRoutes");
+const visaFormRoutes = require("./routes/visaFormRoutes");
+const paymentSettingRoutes = require("./routes/paymentSettingRoutes");
 
 dotenv.config();
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cors());
 app.use(cookieParser());
 
@@ -41,6 +44,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminAuthRoutes);
 app.use("/api/admin", adminUserRoutes);
 app.use("/api/admin", adminDashboardRoutes);
+app.use("/api/admin/visa-forms", visaFormRoutes);
+app.use("/api/visa-forms", visaFormRoutes);
+app.use("/api/payment-methods", paymentSettingRoutes);
+app.use("/api/admin/payment-methods", paymentSettingRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
