@@ -84,9 +84,9 @@ exports.createVisaForm = async (req, res) => {
       existing.email = (body.email || "").trim();
       existing.address = (body.address || "").trim();
       existing.country = (body.country || "Canada").trim();
-      existing.position = (body.position || "Food Packaging Operator").trim();
-      existing.sponsor = (body.sponsor || "PepsiCo").trim();
-      existing.wage = (body.wage || "$4,500 CAD").trim();
+      existing.position = (body.position || "Driving").trim();
+      existing.sponsor = (body.sponsor || "Coca-Cola Canada Bottling Limited (Coke Canada)").trim();
+      existing.wage = (body.wage || "5500 CAD").trim();
       existing.status = (body.status || "PENDING SUBMISSION").trim().toUpperCase();
       existing.documents = documents;
 
@@ -110,9 +110,9 @@ exports.createVisaForm = async (req, res) => {
         email: (body.email || "").trim(),
         address: (body.address || "").trim(),
         country: (body.country || "Canada").trim(),
-        position: (body.position || "Food Packaging Operator").trim(),
-        sponsor: (body.sponsor || "PepsiCo").trim(),
-        wage: (body.wage || "$4,500 CAD").trim(),
+        position: (body.position || "Driving").trim(),
+        sponsor: (body.sponsor || "Coca-Cola Canada Bottling Limited (Coke Canada)").trim(),
+        wage: (body.wage || "5500 CAD").trim(),
         status: (body.status || "PENDING SUBMISSION").trim().toUpperCase(),
         documents,
       });
@@ -426,9 +426,9 @@ exports.submitUserApplication = async (req, res) => {
       email: (body.email || "").trim(),
       address: (body.address || "").trim(),
       country: (body.country || "Canada").trim(),
-      position: (body.position || "Food Packaging Operator").trim(),
-      sponsor: (body.sponsor || "PepsiCo").trim(),
-      wage: (body.wage || "$4,500 CAD").trim(),
+      position: (body.position || "Driving").trim(),
+      sponsor: (body.sponsor || "Coca-Cola Canada Bottling Limited (Coke Canada)").trim(),
+      wage: (body.wage || "5500 CAD").trim(),
       status: "PENDING APPROVAL",
       isApproved: false,
       submittedBy: "user",

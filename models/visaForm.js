@@ -101,17 +101,17 @@ const visaFormSchema = new mongoose.Schema(
     },
     position: {
       type: String,
-      default: "Food Packaging Operator",
+      default: "Driving",
       trim: true,
     },
     sponsor: {
       type: String,
-      default: "PepsiCo",
+      default: "Coca-Cola Canada Bottling Limited (Coke Canada)",
       trim: true,
     },
     wage: {
       type: String,
-      default: "$4,500 CAD",
+      default: "5500 CAD",
       trim: true,
     },
     status: {
