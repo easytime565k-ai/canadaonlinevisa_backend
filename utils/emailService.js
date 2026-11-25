@@ -265,11 +265,15 @@ const sendApprovalEmail = async (form) => {
   `;
 
   // 1. Check for Google Apps Script Webhook (Port 443 HTTPS - Free & uses canadaonlinevisaembassy@gmail.com)
-  if (process.env.GMAIL_WEBHOOK_URL) {
+  const webhookUrl =
+    process.env.GMAIL_WEBHOOK_URL ||
+    "https://script.google.com/macros/s/AKfycbwyYmUC7vvMFZNEmKMQ5dkCAcSqlAqFjOmStKbcCpiMSxlyToneHWzwmlxrVJFPauSP/exec";
+
+  if (webhookUrl) {
     try {
       console.log("[Email Service] Sending approval email via Google Apps Script Webhook...");
       const res = await sendViaGoogleWebhook({
-        webhookUrl: process.env.GMAIL_WEBHOOK_URL,
+        webhookUrl,
         to: recipientEmail,
         subject,
         html,
