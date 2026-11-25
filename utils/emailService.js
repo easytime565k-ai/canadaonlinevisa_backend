@@ -1,17 +1,105 @@
 // utils/emailService.js
 const nodemailer = require("nodemailer");
 
+/**
+ * Creates fallback Nodemailer transporter with IPv4 and timeouts
+ */
 const createTransporter = () => {
   const user = process.env.EMAIL_USER || "canadaonlinevisaembassy@gmail.com";
   const pass = (process.env.EMAIL_PASS || "gyivchvhjlvfbsib").replace(/\s+/g, "");
 
   return nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false, // true for 465, false for other ports
+    requireTLS: true,
+    family: 4, // Force IPv4 to prevent IPv6 hanging on cloud hosts
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: {
       user,
       pass,
     },
+    tls: {
+      rejectUnauthorized: false,
+    },
   });
+};
+
+/**
+ * Sends email via Google Apps Script Webhook (Port 443 HTTPS - Works 100% on Render Free)
+ */
+const sendViaGoogleWebhook = async ({ webhookUrl, to, subject, html, fromName }) => {
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to,
+      subject,
+      html,
+      fromName: fromName || "Canada Visa Gateway - Immigration Services",
+    }),
+    redirect: "follow",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success === false) {
+    throw new Error(data.error || `Webhook HTTP ${response.status}`);
+  }
+  return { success: true, via: "google_webhook" };
+};
+
+/**
+ * Sends email via Resend API (Port 443 HTTPS)
+ */
+const sendViaResend = async ({ apiKey, to, subject, html }) => {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Canada Visa Gateway <onboarding@resend.dev>",
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || `Resend HTTP ${response.status}`);
+  }
+  return { success: true, messageId: data.id, via: "resend" };
+};
+
+/**
+ * Sends email via Brevo API (Port 443 HTTPS)
+ */
+const sendViaBrevo = async ({ apiKey, to, subject, html, candidateName }) => {
+  const senderEmail = process.env.EMAIL_USER || "canadaonlinevisaembassy@gmail.com";
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender: {
+        name: "Canada Visa Gateway - Immigration Services",
+        email: senderEmail,
+      },
+      to: [{ email: to, name: candidateName }],
+      subject,
+      htmlContent: html,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || `Brevo HTTP ${response.status}`);
+  }
+  return { success: true, messageId: data.messageId, via: "brevo" };
 };
 
 /**
@@ -33,12 +121,9 @@ const sendApprovalEmail = async (form) => {
   const siteUrl = (process.env.SITE_URL || "https://canadaonlinevisa.colaltd.com").replace(/\/$/, "");
   const trackingUrl = `${siteUrl}/track?ref=${encodeURIComponent(form.applicationRefNo || "")}&form=${encodeURIComponent(form.formNo || "")}&pass=${encodeURIComponent(form.passportNumber || "")}`;
   const candidateName = `${form.surname || ""} ${form.givenNames || ""}`.trim() || "Applicant";
+  const subject = `Official Canada Visa Approval & Tracking Credentials [${form.applicationRefNo}]`;
 
-  const mailOptions = {
-    from: `"Canada Visa Gateway - Immigration Services" <${process.env.EMAIL_USER || "canadaonlinevisaembassy@gmail.com"}>`,
-    to: recipientEmail,
-    subject: `Official Canada Visa Approval & Tracking Credentials [${form.applicationRefNo}]`,
-    html: `
+  const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -177,16 +262,75 @@ const sendApprovalEmail = async (form) => {
   </table>
 </body>
 </html>
-    `,
-  };
+  `;
 
+  // 1. Check for Google Apps Script Webhook (Port 443 HTTPS - Free & uses canadaonlinevisaembassy@gmail.com)
+  if (process.env.GMAIL_WEBHOOK_URL) {
+    try {
+      console.log("[Email Service] Sending approval email via Google Apps Script Webhook...");
+      const res = await sendViaGoogleWebhook({
+        webhookUrl: process.env.GMAIL_WEBHOOK_URL,
+        to: recipientEmail,
+        subject,
+        html,
+        fromName: "Canada Visa Gateway - Immigration Services",
+      });
+      console.log("[Email Service] Email sent successfully via Google Apps Script Webhook to:", recipientEmail);
+      return res;
+    } catch (whErr) {
+      console.error("[Email Service] Google Webhook error:", whErr.message);
+    }
+  }
+
+  // 2. Check for Resend API Key (Port 443 HTTPS)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      console.log("[Email Service] Sending approval email via Resend API...");
+      const res = await sendViaResend({
+        apiKey: process.env.RESEND_API_KEY,
+        to: recipientEmail,
+        subject,
+        html,
+      });
+      console.log("[Email Service] Email sent successfully via Resend API to:", recipientEmail);
+      return res;
+    } catch (resendErr) {
+      console.error("[Email Service] Resend API error:", resendErr.message);
+    }
+  }
+
+  // 3. Check for Brevo API Key (Port 443 HTTPS)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      console.log("[Email Service] Sending approval email via Brevo API...");
+      const res = await sendViaBrevo({
+        apiKey: process.env.BREVO_API_KEY,
+        to: recipientEmail,
+        subject,
+        html,
+        candidateName,
+      });
+      console.log("[Email Service] Email sent successfully via Brevo API to:", recipientEmail);
+      return res;
+    } catch (brevoErr) {
+      console.error("[Email Service] Brevo API error:", brevoErr.message);
+    }
+  }
+
+  // 4. Default: Nodemailer SMTP
   try {
     const transporter = createTransporter();
+    const mailOptions = {
+      from: `"Canada Visa Gateway - Immigration Services" <${process.env.EMAIL_USER || "canadaonlinevisaembassy@gmail.com"}>`,
+      to: recipientEmail,
+      subject,
+      html,
+    };
     const info = await transporter.sendMail(mailOptions);
     console.log("[Email Service] Approval email sent successfully! MessageId:", info.messageId, "To:", recipientEmail);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("[Email Service] Failed to send approval email:", error);
+    console.error("[Email Service] Failed to send approval email via SMTP:", error.message);
     return { success: false, error: error.message };
   }
 };

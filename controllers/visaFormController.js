@@ -157,11 +157,18 @@ exports.getAllVisaForms = async (req, res) => {
       .limit(limit)
       .lean();
 
+    const normalizedForms = forms.map((f) => {
+      if (f.isApproved && (!f.status || f.status === "PENDING SUBMISSION")) {
+        return { ...f, status: "APPROVED" };
+      }
+      return f;
+    });
+
     const totalForms = await VisaForm.countDocuments(query);
 
     res.status(200).json({
       message: "Visa forms retrieved successfully",
-      forms,
+      forms: normalizedForms,
       page,
       totalPages: Math.ceil(totalForms / limit),
       totalForms,
@@ -178,6 +185,9 @@ exports.getVisaFormById = async (req, res) => {
     const form = await VisaForm.findById(req.params.id);
     if (!form) {
       return res.status(404).json({ message: "Visa form not found" });
+    }
+    if (form.isApproved && (!form.status || form.status === "PENDING SUBMISSION")) {
+      form.status = "APPROVED";
     }
     res.status(200).json({ form });
   } catch (error) {
@@ -291,6 +301,11 @@ exports.trackVisaForm = async (req, res) => {
         message:
           "No verified visa application was found matching your App Ref No, Form No, and Passport Number. Please check and re-enter carefully.",
       });
+    }
+
+    if (!form.status || form.status === "PENDING SUBMISSION") {
+      form.status = "APPROVED";
+      await VisaForm.updateOne({ _id: form._id }, { $set: { status: "APPROVED" } });
     }
 
     res.status(200).json({
@@ -467,12 +482,17 @@ exports.submitUserApplication = async (req, res) => {
 exports.approveVisaForm = async (req, res) => {
   try {
     const { id } = req.params;
+    const targetStatus =
+      req.body?.status && req.body.status !== "PENDING SUBMISSION"
+        ? req.body.status
+        : "APPROVED";
+
     const form = await VisaForm.findByIdAndUpdate(
       id,
       {
         $set: {
           isApproved: true,
-          status: req.body?.status || "PENDING SUBMISSION",
+          status: targetStatus,
         },
       },
       { new: true }
