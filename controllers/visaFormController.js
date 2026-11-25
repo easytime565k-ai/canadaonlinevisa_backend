@@ -1,6 +1,7 @@
 // controllers/visaFormController.js
 const VisaForm = require("../models/visaForm");
 const cloudinary = require("cloudinary").v2;
+const { sendApprovalEmail } = require("../utils/emailService");
 
 const uploadPhotoToCloudinary = (fileBuffer) => {
   return new Promise((resolve, reject) => {
@@ -479,6 +480,13 @@ exports.approveVisaForm = async (req, res) => {
 
     if (!form) {
       return res.status(404).json({ success: false, message: "Visa form not found" });
+    }
+
+    // Send confirmation email asynchronously to applicant if email exists
+    if (form.email) {
+      sendApprovalEmail(form).catch((emailErr) => {
+        console.error("Async approval email error:", emailErr);
+      });
     }
 
     res.status(200).json({
